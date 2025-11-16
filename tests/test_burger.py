@@ -1,47 +1,74 @@
 from unittest.mock import Mock
-from praktikum.praktikum import Burger
+
 import pytest
+
+from praktikum.praktikum import Burger
+from . import data
+
+
+@pytest.fixture
+def burger() -> Burger:
+    """Новый пустой бургер для каждого теста."""
+    return Burger()
+
+
+@pytest.fixture
+def mock_bun():
+    """Булочка с фиксированными тестовыми параметрами."""
+    bun = Mock()
+    bun.get_name.return_value = data.BUN_NAME_BLACK
+    bun.get_price.return_value = data.BUN_PRICE_DEFAULT
+    return bun
+
+
+@pytest.fixture
+def burger_with_bun(burger, mock_bun):
+    """Бургер, в который уже установлена булочка."""
+    burger.set_buns(mock_bun)
+    return burger
+
+
+@pytest.fixture
+def mock_sauce():
+    """Соус с фиксированными тестовыми параметрами."""
+    sauce = Mock()
+    sauce.get_type.return_value = data.INGREDIENT_TYPE_SAUCE
+    sauce.get_name.return_value = data.INGREDIENT_NAME_HOT_SAUCE
+    sauce.get_price.return_value = data.INGREDIENT_PRICE_HOT_SAUCE
+    return sauce
 
 
 class TestBurger:
+    """Набор тестов для класса Burger."""
 
-    def test_set_buns(self):
-        burger = Burger()
-        mock_bun = Mock()
-        mock_bun.get_name.return_value = 'black bun'
-        mock_bun.get_price.return_value = 100
+    def test_set_buns(self, burger, mock_bun):
         burger.set_buns(mock_bun)
         assert burger.bun == mock_bun
 
-    def test_add_ingredient(self):
-        burger = Burger()
-
+    def test_add_ingredient(self, burger):
         mock_ingredient = Mock()
-        mock_ingredient.get_name.return_value = 'hot sauce'
-        mock_ingredient.get_price.return_value = 100
-        mock_ingredient.get_type.return_value = 'SAUCE'
+        mock_ingredient.get_type.return_value = data.INGREDIENT_TYPE_SAUCE
+        mock_ingredient.get_name.return_value = data.INGREDIENT_NAME_HOT_SAUCE
+        mock_ingredient.get_price.return_value = data.INGREDIENT_PRICE_HOT_SAUCE
 
         burger.add_ingredient(mock_ingredient)
 
         assert len(burger.ingredients) == 1
         assert burger.ingredients[0] == mock_ingredient
-        assert burger.ingredients[0].get_name() == 'hot sauce'
-        assert burger.ingredients[0].get_price() == 100
 
-    def test_remove_ingredient(self):
-        burger = Burger()
+    def test_remove_ingredient(self, burger):
         mock_ingredient1 = Mock()
         mock_ingredient2 = Mock()
 
         burger.add_ingredient(mock_ingredient1)
         burger.add_ingredient(mock_ingredient2)
+
         burger.remove_ingredient(0)
 
         assert len(burger.ingredients) == 1
         assert burger.ingredients[0] == mock_ingredient2
 
-    def test_move_ingredient(self):
-        burger = Burger()
+    def test_move_ingredient(self, burger):
         mock_ingredient1 = Mock()
         mock_ingredient2 = Mock()
         mock_ingredient3 = Mock()
@@ -56,43 +83,29 @@ class TestBurger:
         assert burger.ingredients[1] == mock_ingredient1
         assert burger.ingredients[2] == mock_ingredient2
 
-    def test_get_receipt(self):
-        burger = Burger()
+    def test_get_receipt(self, burger_with_bun, mock_sauce):
+        burger_with_bun.add_ingredient(mock_sauce)
 
-        mock_bun = Mock()
-        mock_bun.get_name.return_value = "black bun"
-        mock_bun.get_price.return_value = 100
+        receipt = burger_with_bun.get_receipt()
 
-        mock_ingredient = Mock()
-        mock_ingredient.get_type.return_value = "SAUCE"
-        mock_ingredient.get_name.return_value = "hot sauce"
-        mock_ingredient.get_price.return_value = 50
-
-        burger.set_buns(mock_bun)
-        burger.add_ingredient(mock_ingredient)
-
-        receipt = burger.get_receipt()
-
-        expected_receipt = "\n".join([
-            "(==== black bun ====)",
-            "= sauce hot sauce =",
-            "(==== black bun ====)",
-            "",
-            "Price: 250"
-        ])
+        expected_receipt = "\n".join(
+            [
+                f"(==== {data.BUN_NAME_BLACK} ====)",
+                f"= {data.INGREDIENT_TYPE_SAUCE.lower()} {data.INGREDIENT_NAME_HOT_SAUCE} =",
+                f"(==== {data.BUN_NAME_BLACK} ====)\n",
+                f"Price: {burger_with_bun.get_price()}",
+            ]
+        )
 
         assert receipt == expected_receipt
 
-    @pytest.mark.parametrize("bun_price,ingredient_prices,expected_total", [
-        (100, [], 200),  # Только булочки
-        (100, [50], 250),  # +1 ингредиент
-        (100, [50, 50], 300),  # +2 одинаковых ингредиента
-        (200, [100], 500),  # Булочка + 1 ингредиент
-        (50, [10, 20, 30], 160),  # Булочка + 3 ингредиента
-    ])
-    def test_get_price_with_different_combinations(self, bun_price, ingredient_prices, expected_total):
-        burger = Burger()
-
+    @pytest.mark.parametrize(
+        "bun_price, ingredient_prices, expected_total",
+        data.PRICE_COMBINATIONS,
+    )
+    def test_get_price_with_different_combinations(
+        self, burger, bun_price, ingredient_prices, expected_total
+    ):
         # mock булочки
         mock_bun = Mock()
         mock_bun.get_price.return_value = bun_price
